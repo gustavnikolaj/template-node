@@ -85,10 +85,23 @@ async function npmInit() {
     env.NPM_CONFIG_INIT_VERSION = '0.0.0';
     await spawn('npm', ['init', '-y'], { env });
 
+    // clean up the package.json file. npm init with the -y flag has some
+    // default behavior we don't want to inherit. 
+    const pkgJson = await loadPackageJson();
+
     // npm init will default the description to the first line of the README.md
     // if the file exists when it is being run.
-    const pkgJson = await loadPackageJson();
     pkgJson.description = '';
+
+    // npm init will default the main property to a seemingly random .js file
+    // in the project if it's not empty yet.
+    pkgJson.main = '';
+
+    // unset the default test target
+    if (pkgJson.scripts && pkgJson.scripts.test) {
+      delete pkgJson.scripts.test;
+    }
+
     await savePackageJson(pkgJson);
   }
 }
