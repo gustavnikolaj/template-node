@@ -35,6 +35,21 @@ async function fileExists(path) {
   }
 }
 
+async function loadPackageJson() {
+  const contents = await readFile(resolveFromRoot('package.json'), 'utf-8');
+  return JSON.parse(contents);
+}
+
+async function packageJsonHasDevDependency(name) {
+  const packageJson = await loadPackageJson();
+
+  if (packageJson.devDependencies) {
+    return packageJson.devDependencies[name];
+  }
+
+  return false;
+}
+
 function spawn(command, args) {
   return new Promise((resolve, reject) => {
     childProcess.spawn(command, args, { stdio: ['pipe', process.stdout, process.stderr] })
@@ -54,6 +69,14 @@ async function npmInit() {
     console.error('Skipping `npm init`, package.json already exists.');
   } else {
     return spawn('npm', ['init', '-y']);
+  }
+}
+
+async function installPrettier() {
+  if (await packageJsonHasDevDependency('prettier')) {
+    console.error('Skipping prettier installation: Already installed');
+  } else {
+    return spawn('npm', ['install', '--save-dev', 'prettier']);
   }
 }
 
@@ -79,6 +102,7 @@ async function selfRemove() {
 
 async function main () {
   await npmInit();
+  await installPrettier();
 
   console.error('Removing bootstrap script.');
   await selfRemove();
