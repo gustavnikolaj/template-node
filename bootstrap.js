@@ -50,9 +50,9 @@ async function packageJsonHasDevDependency(name) {
   return false;
 }
 
-function spawn(command, args) {
+function spawn(command, args, opts) {
   return new Promise((resolve, reject) => {
-    childProcess.spawn(command, args, { stdio: ['pipe', process.stdout, process.stderr] })
+    childProcess.spawn(command, args, { stdio: ['pipe', process.stdout, process.stderr], ...opts })
       .on('error', (err) => reject(err))
       .on('close', (code) => {
         if (code === 0) {
@@ -68,7 +68,9 @@ async function npmInit() {
   if (await fileExists('package.json')) {  
     console.error('Skipping `npm init`, package.json already exists.');
   } else {
-    return spawn('npm', ['init', '-y']);
+    const env = Object.create(process.env);
+    env.NPM_CONFIG_INIT_VERSION = '0.0.0';
+    return spawn('npm', ['init', '-y'], { env });
   }
 }
 
