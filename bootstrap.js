@@ -167,7 +167,7 @@ async function installUnexpected() {
 }
 
 async function nvmInit() {
-  if (await fileExists('.nvmrc')) {
+  if (await fileExists(".nvmrc")) {
     console.error("Skipping nvm configuration: Already configured");
   } else {
     if (process.env.NVM_DIR) {
@@ -175,13 +175,13 @@ async function nvmInit() {
       const nodeVersion = process.version.replace(/^v/, "");
       await writeFile(nvmFile, nodeVersion);
     } else {
-      console.error('Skipping nvm configuration: nvm not found.');
+      console.error("Skipping nvm configuration: nvm not found.");
     }
   }
 }
 
 async function gitInit() {
-  if (await fileExists('.git')) {
+  if (await fileExists(".git")) {
     console.error("Already in a git repo.");
   } else {
     return spawn("git", ["init"]);
