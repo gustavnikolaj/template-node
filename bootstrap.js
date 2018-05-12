@@ -134,6 +134,9 @@ async function installEslint() {
 
 async function selfRemove() {
   const { SKIPREMOVAL } = process.env;
+
+  console.error('Removing bootstrap script.');
+
   if (SKIPREMOVAL) {
     console.error('Skipping removal of: %s', __filename);
   } else {
@@ -156,8 +159,6 @@ async function main () {
   await npmInit();
   await installPrettier();
   await installEslint();
-
-  console.error('Removing bootstrap script.');
   await selfRemove();
 }
 
