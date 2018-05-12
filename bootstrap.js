@@ -64,6 +64,14 @@ function spawn(command, args, opts) {
   });
 }
 
+function npmInstallDev(...packages) {
+  return spawn('npm', [
+    'install',
+    '--save-dev',
+    ...packages
+  ]);
+}
+
 async function npmInit() {
   if (await fileExists('package.json')) {  
     console.error('Skipping `npm init`, package.json already exists.');
@@ -78,7 +86,20 @@ async function installPrettier() {
   if (await packageJsonHasDevDependency('prettier')) {
     console.error('Skipping prettier installation: Already installed');
   } else {
-    return spawn('npm', ['install', '--save-dev', 'prettier']);
+    return npmInstallDev('prettier');
+  }
+}
+
+async function installEslint() {
+  if (await packageJsonHasDevDependency('eslint')) {
+    console.error('Skipping eslint installation: Already installed');
+  } else {
+    return npmInstallDev(
+      'eslint',
+      'eslint-config-pretty-standard',
+      'eslint-plugin-import',
+      'eslint-plugin-prettier'
+    );
   }
 }
 
@@ -105,6 +126,7 @@ async function selfRemove() {
 async function main () {
   await npmInit();
   await installPrettier();
+  await installEslint();
 
   console.error('Removing bootstrap script.');
   await selfRemove();
