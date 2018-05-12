@@ -105,12 +105,17 @@ async function installEslint() {
   if (await packageJsonHasDevDependency('eslint')) {
     console.error('Skipping eslint installation: Already installed');
   } else {
-    return npmInstallDev(
+    await npmInstallDev(
       'eslint',
       'eslint-config-pretty-standard',
       'eslint-plugin-import',
       'eslint-plugin-prettier'
     );
+
+    const pkgJson = await loadPackageJson();
+    pkgJson.scripts = pkgJson.scripts || {};
+    pkgJson.scripts.lint = 'eslint .';
+    await savePackageJson(pkgJson);
   }
 }
 
