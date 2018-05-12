@@ -45,6 +45,15 @@ async function savePackageJson(contents) {
   return writeFile(resolveFromRoot('package.json'), serialized);
 }
 
+function sortObjectKeys(obj) {
+  return Object.keys(obj)
+    .sort((a, b) => a.localeCompare(b))
+    .reduce((newObj, key) => {
+      newObj[key] = obj[key];
+      return newObj;
+    }, {});
+}
+
 async function packageJsonHasDevDependency(name) {
   const packageJson = await loadPackageJson();
 
@@ -128,6 +137,23 @@ async function installEslint() {
     const pkgJson = await loadPackageJson();
     pkgJson.scripts = pkgJson.scripts || {};
     pkgJson.scripts.lint = 'eslint .';
+    pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
+    await savePackageJson(pkgJson);
+  }
+}
+
+async function installJest() {
+  if (await packageJsonHasDevDependency('jest')) {
+    console.error('Skipping jest installation: Already installed');
+  } else {
+    await npmInstallDev('jest');
+
+    const pkgJson = await loadPackageJson();
+    pkgJson.scripts = pkgJson.scripts || {};
+    pkgJson.scripts.test = 'jest';
+    pkgJson.scripts['test-watch'] = 'jest --watch';
+    pkgJson.scripts.coverage = 'jest --coverage';
+    pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
     await savePackageJson(pkgJson);
   }
 }
@@ -159,6 +185,7 @@ async function main () {
   await npmInit();
   await installPrettier();
   await installEslint();
+  await installJest();
   await selfRemove();
 }
 
