@@ -166,6 +166,20 @@ async function installUnexpected() {
   }
 }
 
+async function nvmInit() {
+  if (await fileExists('.nvmrc')) {
+    console.error("Skipping nvm configuration: Already configured");
+  } else {
+    if (process.env.NVM_DIR) {
+      const nvmFile = resolveFromRoot(".nvmrc");
+      const nodeVersion = process.version.replace(/^v/, "");
+      await writeFile(nvmFile, nodeVersion);
+    } else {
+      console.error('Skipping nvm configuration: nvm not found.');
+    }
+  }
+}
+
 async function gitInit() {
   if (await fileExists('.git')) {
     console.error("Already in a git repo.");
@@ -203,6 +217,7 @@ async function main() {
   await installEslint();
   await installJest();
   await installUnexpected();
+  await nvmInit();
   await gitInit();
   await selfRemove();
 }
