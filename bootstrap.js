@@ -40,6 +40,11 @@ async function loadPackageJson() {
   return JSON.parse(contents);
 }
 
+async function savePackageJson(contents) {
+  const serialized = JSON.stringify(contents, null, 2);
+  return writeFile(resolveFromRoot('package.json'), serialized);
+}
+
 async function packageJsonHasDevDependency(name) {
   const packageJson = await loadPackageJson();
 
@@ -78,7 +83,13 @@ async function npmInit() {
   } else {
     const env = Object.create(process.env);
     env.NPM_CONFIG_INIT_VERSION = '0.0.0';
-    return spawn('npm', ['init', '-y'], { env });
+    await spawn('npm', ['init', '-y'], { env });
+
+    // npm init will default the description to the first line of the README.md
+    // if the file exists when it is being run.
+    const pkgJson = await loadPackageJson();
+    pkgJson.description = '';
+    await savePackageJson(pkgJson);
   }
 }
 
