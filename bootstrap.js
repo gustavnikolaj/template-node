@@ -158,6 +158,14 @@ async function installJest() {
   }
 }
 
+async function installUnexpected() {
+  if (await packageJsonHasDevDependency("unexpected")) {
+    console.error("Skipping unexpected installation: Already installed");
+  } else {
+    await npmInstallDev("unexpected");
+  }
+}
+
 async function selfRemove() {
   const { SKIPREMOVAL } = process.env;
 
@@ -186,6 +194,7 @@ async function main() {
   await installPrettier();
   await installEslint();
   await installJest();
+  await installUnexpected();
   await selfRemove();
 }
 
