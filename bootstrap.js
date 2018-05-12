@@ -166,6 +166,14 @@ async function installUnexpected() {
   }
 }
 
+async function gitInit() {
+  if (await fileExists('.git')) {
+    console.error("Already in a git repo.");
+  } else {
+    return spawn("git", ["init"]);
+  }
+}
+
 async function selfRemove() {
   const { SKIPREMOVAL } = process.env;
 
@@ -195,6 +203,7 @@ async function main() {
   await installEslint();
   await installJest();
   await installUnexpected();
+  await gitInit();
   await selfRemove();
 }
 
