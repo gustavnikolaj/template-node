@@ -21,6 +21,31 @@ const unlinkFile = promisify(fs.unlink);
 const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
 
+function exec(command) {
+  return new Promise((resolve, reject) => {
+    childProcess.exec(command, { cwd: __dirname }, (err, stdout, stderr) =>
+      resolve({ err, stderr, stdout })
+    );
+  });
+}
+
+async function findLatestVersionOnNpm(packageName) {
+  const {err, stdout} = await exec(`npm info --json ${packageName}`);
+
+  if (err) {
+    throw err;
+  }
+
+  const npmInfo = JSON.parse(stdout);
+
+  return npmInfo['dist-tags'].latest
+}
+
+async function latestVersion(packageName) {
+  const version = await findLatestVersionOnNpm(packageName);
+  return `^${version}`;
+}
+
 async function fileExists(path) {
   const resolvedPath = resolveFromRoot(path);
 
@@ -82,8 +107,18 @@ function spawn(command, args, opts) {
   });
 }
 
-function npmInstallDev(...packages) {
-  return spawn("npm", ["install", "--save-dev", ...packages]);
+async function npmInstallDev(...packages) {
+  const pkgJson = await loadPackageJson();
+
+  pkgJson.devDependencies = pkgJson.devDependencies || {};
+
+  for (const package of packages) {
+    pkgJson.devDependencies[package] = await latestVersion(package);
+  }
+
+  pkgJson.devDependencies = sortObjectKeys(pkgJson.devDependencies);
+
+  await savePackageJson(pkgJson);
 }
 
 async function npmInit() {
@@ -143,7 +178,6 @@ async function installJest() {
     const pkgJson = await loadPackageJson();
     pkgJson.scripts = pkgJson.scripts || {};
     pkgJson.scripts.test = "jest";
-    pkgJson.scripts["test-watch"] = "jest --watch";
     pkgJson.scripts.coverage = "jest --coverage";
     pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
     await savePackageJson(pkgJson);
@@ -214,7 +248,7 @@ async function main() {
 }
 
 main().then(
-  () => console.error("Bootstrap completed."),
+  () => console.error("Bootstrap completed. Now install dependencies with yarn or npm."),
   err => {
     console.error("An error happened. Try running the script again.\n");
     console.error(err.stack);
