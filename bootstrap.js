@@ -1,12 +1,12 @@
 /*                         PROJECT BOOTSTRAP SCRIPT
  * ============================================================================
- * 
+ *
  * After copying this template into a new folder, run this script to configure
  * and install dependencies.
- * 
+ *
  * The script is idempotent so it can be run multiple times if it fails
  * partially or entirely, and it will resume from where ever it made it to.
- * 
+ *
  * Upon success it will remove itself.
  */
 
@@ -115,28 +115,20 @@ async function npmInit() {
   }
 }
 
-async function installPrettier() {
-  if (await packageJsonHasDevDependency("prettier")) {
-    console.error("Skipping prettier installation: Already installed");
-  } else {
-    return npmInstallDev("prettier");
-  }
-}
-
-async function installEslint() {
+async function installEslintAndPrettier() {
   if (await packageJsonHasDevDependency("eslint")) {
     console.error("Skipping eslint installation: Already installed");
   } else {
     await npmInstallDev(
+      "prettier",
       "eslint",
       "eslint-config-pretty-standard",
-      "eslint-plugin-import",
-      "eslint-plugin-prettier"
+      "eslint-plugin-import"
     );
 
     const pkgJson = await loadPackageJson();
     pkgJson.scripts = pkgJson.scripts || {};
-    pkgJson.scripts.lint = "eslint .";
+    pkgJson.scripts.lint = "eslint . && prettier --check '**/*.js'";
     pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
     await savePackageJson(pkgJson);
   }
@@ -213,8 +205,7 @@ async function selfRemove() {
 
 async function main() {
   await npmInit();
-  await installPrettier();
-  await installEslint();
+  await installEslintAndPrettier();
   await installJest();
   await installUnexpected();
   await nvmInit();
