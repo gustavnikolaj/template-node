@@ -221,9 +221,14 @@ async function gitInit() {
   }
 }
 
-const kebabToCamel = (name) => name.split(/[-_]/).reduce((acc, el) => {
-  return acc + el.charAt(0).toUpperCase() + el.slice(1);
-}, "");
+const kebabToCamel = (name) => name
+  .split(/[-_]/)
+  .reduce((acc, el, index) => {
+    const part = index === 0
+      ? part
+      : el.charAt(0).toUpperCase() + el.slice(1)
+    return acc + part;
+  }, "");
 
 async function touchEntryPointFiles() {
   const pkgJson = await loadPackageJson();
