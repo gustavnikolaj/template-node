@@ -264,6 +264,18 @@ async function touchEntryPointFiles() {
   await savePackageJson(pkgJson);
 }
 
+async function setupVsCode() {
+  fs.mkdirSync(resolveFromRoot(".vscode"));
+  const settingsPath = resolveFromRoot(".vscode/settings.json");
+  const gitignorePath = resolveFromRoot(".gitignore");
+
+  const contents = JSON.stringify({ "editor.formatOnSave": true }, null, 4) + "\n";
+  fs.writeFileSync(settingsPath, contents, "utf-8");
+
+  const gitignoreContent = "\n# VS Code User Specific Settings\n/.vscode/settings.json\n";
+  fs.appendFileSync(gitignorePath, gitignoreContent, "utf-8");
+}
+
 async function selfRemove() {
   const { SKIPREMOVAL } = process.env;
 
@@ -297,6 +309,10 @@ async function main() {
 
   if (process.argv.includes('--touch')) {
     await touchEntryPointFiles();
+  }
+
+  if (process.argv.includes('--vscode')) {
+    await setupVsCode();
   }
 
   await selfRemove();
