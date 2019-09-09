@@ -174,17 +174,19 @@ async function installEslintAndPrettier() {
   }
 }
 
-async function installJest() {
-  if (await packageJsonHasDevDependency("jest")) {
-    console.error("Skipping jest installation: Already installed");
+async function installMochaAndNyc() {
+  if (await packageJsonHasDevDependency("mocha")) {
+    console.error("Skipping mocha installation: Already installed");
   } else {
-    await npmInstallDev("jest");
+    await npmInstallDev("mocha", "nyc");
 
     const pkgJson = await loadPackageJson();
     pkgJson.scripts = pkgJson.scripts || {};
-    pkgJson.scripts.test = "jest";
-    pkgJson.scripts.coverage = "jest --coverage";
+    pkgJson.scripts.test = "mocha";
+    pkgJson.scripts.coverage = "nyc";
     pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
+    pkgJson.mocha = { recursive: true }
+    pkgJson.nyc = { cache: true, reporter: ["html", "lcov", "text"] };
     await savePackageJson(pkgJson);
   }
 }
@@ -245,7 +247,7 @@ async function selfRemove() {
 async function main() {
   await npmInit();
   await installEslintAndPrettier();
-  await installJest();
+  await installMochaAndNyc();
   await installUnexpected();
   await nvmInit();
   await gitInit();
