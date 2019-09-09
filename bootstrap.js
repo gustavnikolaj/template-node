@@ -221,6 +221,43 @@ async function gitInit() {
   }
 }
 
+const kebabToCamel = (name) => name.split(/[-_]/).reduce((acc, el) => {
+  return acc + el.charAt(0).toUpperCase() + el.slice(1);
+}, "");
+
+async function touchEntryPointFiles() {
+  const pkgJson = await loadPackageJson();
+
+  const camelCasedName = kebabToCamel(pkgJson.name);
+
+  const libDir = resolveFromRoot('lib');
+  const testDir = resolveFromRoot('test');
+
+  fs.mkdirSync(libDir);
+  fs.mkdirSync(testDir);
+
+  const template = `module.exports = function ${camelCasedName}() {};\n`;
+
+  const testTemplate = [
+    `const expect = require("unexpected");`,
+    `const ${camelCasedName} = require("../lib/${name}");`,
+    "",
+    `describe("${name}", () => {`,
+    `  it("should be a function", () => {`,
+    `    expect(${camelCasedName}, "to be a function");`,
+    `  });`,
+    `});`,
+    ""
+  ].join("\n");
+
+  fs.writeFileSync(resolveFromRoot(`lib/${name}.js`), template, "utf-8");
+  fs.writeFileSync(resolveFromRoot(`test/${name}.spec.js`), testTemplate, "utf-8");
+
+  pkgJson.main = `lib/${name}.js`;
+
+  await savePackageJson(pkgJson);
+}
+
 async function selfRemove() {
   const { SKIPREMOVAL } = process.env;
 
@@ -251,6 +288,11 @@ async function main() {
   await installUnexpected();
   await nvmInit();
   await gitInit();
+
+  if (process.argv.includes('--touch')) {
+    await touchEntryPointFiles();
+  }
+
   await selfRemove();
 }
 
