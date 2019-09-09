@@ -225,7 +225,7 @@ const kebabToCamel = (name) => name
   .split(/[-_]/)
   .reduce((acc, el, index) => {
     const part = index === 0
-      ? part
+      ? el
       : el.charAt(0).toUpperCase() + el.slice(1)
     return acc + part;
   }, "");
