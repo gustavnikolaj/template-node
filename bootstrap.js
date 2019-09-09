@@ -227,8 +227,9 @@ const kebabToCamel = (name) => name.split(/[-_]/).reduce((acc, el) => {
 
 async function touchEntryPointFiles() {
   const pkgJson = await loadPackageJson();
+  const name = pkgJson.name;
 
-  const camelCasedName = kebabToCamel(pkgJson.name);
+  const camelCasedName = kebabToCamel(name);
 
   const libDir = resolveFromRoot('lib');
   const testDir = resolveFromRoot('test');
