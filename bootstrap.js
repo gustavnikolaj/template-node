@@ -230,7 +230,7 @@ const kebabToCamel = (name) => name
     return acc + part;
   }, "");
 
-async function touchEntryPointFiles() {
+async function touchEntryPointFiles(preferCamel = false) {
   const pkgJson = await loadPackageJson();
   const name = pkgJson.name;
 
@@ -244,11 +244,13 @@ async function touchEntryPointFiles() {
 
   const template = `module.exports = function ${camelCasedName}() {};\n`;
 
+  const fileName = preferCamel ? camelCasedName : name;
+
   const testTemplate = [
     `const expect = require("unexpected");`,
-    `const ${camelCasedName} = require("../lib/${name}");`,
+    `const ${camelCasedName} = require("../lib/${fileName}");`,
     "",
-    `describe("${name}", () => {`,
+    `describe("${fileName}", () => {`,
     `  it("should be a function", () => {`,
     `    expect(${camelCasedName}, "to be a function");`,
     `  });`,
@@ -256,10 +258,10 @@ async function touchEntryPointFiles() {
     ""
   ].join("\n");
 
-  fs.writeFileSync(resolveFromRoot(`lib/${name}.js`), template, "utf-8");
-  fs.writeFileSync(resolveFromRoot(`test/${name}.spec.js`), testTemplate, "utf-8");
+  fs.writeFileSync(resolveFromRoot(`lib/${fileName}.js`), template, "utf-8");
+  fs.writeFileSync(resolveFromRoot(`test/${fileName}.spec.js`), testTemplate, "utf-8");
 
-  pkgJson.main = `lib/${name}.js`;
+  pkgJson.main = `lib/${fileName}.js`;
 
   await savePackageJson(pkgJson);
 }
@@ -308,7 +310,8 @@ async function main() {
   await gitInit();
 
   if (process.argv.includes('--touch')) {
-    await touchEntryPointFiles();
+    const preferCamelCaseForFileNames = process.argv.includes('--camel');
+    await touchEntryPointFiles(preferCamelCaseForFileNames);
   }
 
   if (process.argv.includes('--vscode')) {
