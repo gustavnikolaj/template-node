@@ -287,17 +287,8 @@ async function selfRemove() {
     console.error("Skipping removal of: %s", __filename);
   } else {
     await unlinkFile(__filename);
-
-    let readmeContents = await readFile(resolveFromRoot("README.md"), "utf-8");
-
-    for (const line of readmeContents.split("\n")) {
-      if (/bootstrap\.js/.test(line)) {
-        readmeContents = readmeContents.replace(new RegExp(line + "\\s+"), "");
-        break;
-      }
-    }
-
-    await writeFile(resolveFromRoot("README.md"), readmeContents);
+    // Remove the usage notes in README.md
+    await writeFile(resolveFromRoot("README.md"), "");
   }
 }
 
