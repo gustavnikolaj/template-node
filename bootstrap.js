@@ -313,11 +313,7 @@ async function main() {
 
 main().then(
   () => {
-    console.error("Bootstrap completed. Now install dependencies with yarn or npm.");
-    console.error("");
-    console.error("To setup a project local yarn run:");
-    console.error(" $ npx yarn-local")
-    console.error("");
+    console.error("Bootstrap completed. Now install dependencies with npm.");
   },
   err => {
     console.error("An error happened. Try running the script again.\n");
