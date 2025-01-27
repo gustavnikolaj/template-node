@@ -10,6 +10,14 @@
  * Upon success it will remove itself.
  */
 
+const [major] = process.versions.node.split('.').map(Number);
+
+if (major < 20) {
+  throw new Error(
+    `Unsupported Node.js version: ${process.version}. Please use Node.js 20 or higher.`
+  );
+}
+
 const fs = require("fs");
 const { promisify } = require("util");
 const childProcess = require("child_process");
@@ -160,7 +168,6 @@ async function installEslintAndPrettier() {
       "eslint-config-prettier",
       "eslint-config-standard",
       "eslint-plugin-import",
-      "eslint-plugin-mocha",
       "eslint-plugin-node",
       "eslint-plugin-promise"
     );
@@ -173,27 +180,14 @@ async function installEslintAndPrettier() {
   }
 }
 
-async function installMocha() {
-  if (await packageJsonHasDevDependency("mocha")) {
-    console.error("Skipping mocha installation: Already installed");
-  } else {
-    await npmInstallDev("mocha");
+async function setupTesting() {
+  await npmInstallDev("unexpected");
 
-    const pkgJson = await loadPackageJson();
-    pkgJson.scripts = pkgJson.scripts || {};
-    pkgJson.scripts.test = "mocha";
-    pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
-    pkgJson.mocha = { recursive: true }
-    await savePackageJson(pkgJson);
-  }
-}
-
-async function installUnexpected() {
-  if (await packageJsonHasDevDependency("unexpected")) {
-    console.error("Skipping unexpected installation: Already installed");
-  } else {
-    await npmInstallDev("unexpected");
-  }
+  const pkgJson = await loadPackageJson();
+  pkgJson.scripts = pkgJson.scripts || {};
+  pkgJson.scripts.test = "node --test";
+  pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
+  await savePackageJson(pkgJson);
 }
 
 async function nvmInit() {
@@ -244,6 +238,7 @@ async function touchEntryPointFiles(preferCamel = false) {
   const fileName = preferCamel ? camelCasedName : name;
 
   const testTemplate = [
+    `const { describe, it } = require('node:test');`,
     `const expect = require("unexpected");`,
     `const ${camelCasedName} = require("../lib/${fileName}");`,
     "",
@@ -292,8 +287,7 @@ async function selfRemove() {
 async function main() {
   await npmInit();
   await installEslintAndPrettier();
-  await installMocha();
-  await installUnexpected();
+  await setupTesting();
   await nvmInit();
   await gitInit();
 
