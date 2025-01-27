@@ -1,0 +1,5 @@
+# Exclude sandbox files
+Dockerfile export-ignore
+.dockerignore export-ignore
+.gitattributes export-ignore
+run.sh export-ignore
