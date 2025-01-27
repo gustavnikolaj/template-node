@@ -173,19 +173,17 @@ async function installEslintAndPrettier() {
   }
 }
 
-async function installMochaAndNyc() {
+async function installMocha() {
   if (await packageJsonHasDevDependency("mocha")) {
     console.error("Skipping mocha installation: Already installed");
   } else {
-    await npmInstallDev("mocha", "nyc");
+    await npmInstallDev("mocha");
 
     const pkgJson = await loadPackageJson();
     pkgJson.scripts = pkgJson.scripts || {};
     pkgJson.scripts.test = "mocha";
-    pkgJson.scripts.coverage = "nyc mocha";
     pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
     pkgJson.mocha = { recursive: true }
-    pkgJson.nyc = { cache: true, reporter: ["html", "lcov", "text"] };
     await savePackageJson(pkgJson);
   }
 }
@@ -294,7 +292,7 @@ async function selfRemove() {
 async function main() {
   await npmInit();
   await installEslintAndPrettier();
-  await installMochaAndNyc();
+  await installMocha();
   await installUnexpected();
   await nvmInit();
   await gitInit();
