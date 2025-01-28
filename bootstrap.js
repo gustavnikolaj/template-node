@@ -68,6 +68,19 @@ async function fileExists(path) {
   }
 }
 
+function cjs2esm(str) {
+  return str
+    .replace(
+      /const (\w+) = require\("(.+)"\);/g,
+      'import $1 from "$2";'
+    )
+    .replace(
+      /const (\{[\w\s,]*\}) = require\("(.+)"\);/g,
+      'import $1 from "$2";'
+    )
+    .replace("module.exports =", "export default")
+}
+
 async function loadPackageJson() {
   const contents = await readFile(resolveFromRoot("package.json"), "utf-8");
   return JSON.parse(contents);
@@ -129,7 +142,7 @@ async function npmInstallDev(...packages) {
   await savePackageJson(pkgJson);
 }
 
-async function npmInit() {
+async function npmInit(shouldBeEsmSyntax) {
   if (await fileExists("package.json")) {
     console.error("Skipping `npm init`, package.json already exists.");
   } else {
@@ -139,7 +152,7 @@ async function npmInit() {
 
     // clean up the package.json file. npm init with the -y flag has some
     // default behavior we don't want to inherit.
-    const pkgJson = await loadPackageJson();
+    let pkgJson = await loadPackageJson();
 
     // npm init will default the description to the first line of the README.md
     // if the file exists when it is being run.
@@ -154,11 +167,23 @@ async function npmInit() {
       delete pkgJson.scripts.test;
     }
 
+    if (shouldBeEsmSyntax) {
+      // Dumb way to set type: module, but if I just add the property
+      // directly on the object, it will be added to the top, and I want
+      // it after the main property. This was the easy and dumbest way...
+      let pkgJsonString = JSON.stringify(pkgJson);
+      pkgJsonString = pkgJsonString.replace(
+        ',"main":"",',
+        ',"main":"","type":"module",'
+      );
+      pkgJson = JSON.parse(pkgJsonString);
+    }
+
     await savePackageJson(pkgJson);
   }
 }
 
-async function installEslintAndPrettier() {
+async function installEslintAndPrettier(shouldBeEsmSyntax) {
   if (await packageJsonHasDevDependency("eslint")) {
     console.error("Skipping eslint installation: Already installed");
   } else {
@@ -173,6 +198,19 @@ async function installEslintAndPrettier() {
     pkgJson.scripts.lint = "eslint . && prettier --check '**/*.js'";
     pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
     await savePackageJson(pkgJson);
+
+    if (shouldBeEsmSyntax) {
+      let eslintConfPath = resolveFromRoot('eslint.config.js');
+      let conf = await readFile(eslintConfPath, 'utf-8');
+
+      conf = cjs2esm(conf);
+      conf = conf.replace(
+        /\{\s*languageOptions:\s*\{\s*sourceType:\s*"commonjs",\s*\},\s*\},\s*/,
+        ''
+      )
+
+      await writeFile(eslintConfPath, conf, 'utf-8')
+    }
   }
 }
 
@@ -217,7 +255,7 @@ const kebabToCamel = (name) => name
     return acc + part;
   }, "");
 
-async function touchEntryPointFiles(preferCamel = false) {
+async function touchEntryPointFiles(shouldBeEsmSyntax, preferCamel = false) {
   const pkgJson = await loadPackageJson();
   const name = pkgJson.name;
 
@@ -229,14 +267,17 @@ async function touchEntryPointFiles(preferCamel = false) {
   fs.mkdirSync(libDir);
   fs.mkdirSync(testDir);
 
-  const template = `module.exports = function ${camelCasedName}() {};\n`;
+  let template = shouldBeEsmSyntax
+    ? `export default function ${camelCasedName}() {}\n`
+    : `module.exports = function ${camelCasedName}() {};\n`;
 
   const fileName = preferCamel ? camelCasedName : name;
+  const importName = shouldBeEsmSyntax ? `${fileName}.js` : fileName;
 
-  const testTemplate = [
+  let testTemplate = [
     `const { describe, it } = require("node:test");`,
     `const expect = require("unexpected");`,
-    `const ${camelCasedName} = require("../lib/${fileName}");`,
+    `const ${camelCasedName} = require("../lib/${importName}");`,
     "",
     `describe("${fileName}", () => {`,
     `  it("should be a function", () => {`,
@@ -246,6 +287,10 @@ async function touchEntryPointFiles(preferCamel = false) {
     ""
   ].join("\n");
 
+  if (shouldBeEsmSyntax) {
+    testTemplate = cjs2esm(testTemplate);
+  }
+
   fs.writeFileSync(resolveFromRoot(`lib/${fileName}.js`), template, "utf-8");
   fs.writeFileSync(resolveFromRoot(`test/${fileName}.spec.js`), testTemplate, "utf-8");
 
@@ -254,12 +299,18 @@ async function touchEntryPointFiles(preferCamel = false) {
   await savePackageJson(pkgJson);
 }
 
-async function setupVsCode() {
+async function setupVsCode(shouldBeEsmSyntax) {
   fs.mkdirSync(resolveFromRoot(".vscode"));
   const settingsPath = resolveFromRoot(".vscode/settings.json");
   const gitignorePath = resolveFromRoot(".gitignore");
 
-  const contents = JSON.stringify({ "editor.formatOnSave": true }, null, 4) + "\n";
+  const settings = { "editor.formatOnSave": true };
+
+  if (shouldBeEsmSyntax) {
+    settings["javascript.preferences.importModuleSpecifierEnding"] = "js";
+  }
+
+  const contents = JSON.stringify(settings, null, 4) + "\n";
   fs.writeFileSync(settingsPath, contents, "utf-8");
 
   const gitignoreContent = "\n# VS Code User Specific Settings\n/.vscode/settings.json\n";
@@ -281,19 +332,24 @@ async function selfRemove() {
 }
 
 async function main() {
-  await npmInit();
-  await installEslintAndPrettier();
+  let shouldBeEsmSyntax = true;
+  if (process.argv.includes('--cjs')) {
+    shouldBeEsmSyntax = false;
+  }
+
+  await npmInit(shouldBeEsmSyntax);
+  await installEslintAndPrettier(shouldBeEsmSyntax);
   await setupTesting();
   await nvmInit();
   await gitInit();
 
-  if (process.argv.includes('--touch')) {
+  if (!process.argv.includes('--no-touch') || !process.argv.includes('--skip-touch')) {
     const preferCamelCaseForFileNames = process.argv.includes('--camel');
-    await touchEntryPointFiles(preferCamelCaseForFileNames);
+    await touchEntryPointFiles(shouldBeEsmSyntax, preferCamelCaseForFileNames);
   }
 
   if (process.argv.includes('--vscode')) {
-    await setupVsCode();
+    await setupVsCode(shouldBeEsmSyntax);
   }
 
   await selfRemove();
