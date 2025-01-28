@@ -165,11 +165,7 @@ async function installEslintAndPrettier() {
     await npmInstallDev(
       "prettier",
       "eslint",
-      "eslint-config-prettier",
-      "eslint-config-standard",
-      "eslint-plugin-import",
-      "eslint-plugin-node",
-      "eslint-plugin-promise"
+      "eslint-plugin-import"
     );
 
     const pkgJson = await loadPackageJson();
@@ -238,7 +234,7 @@ async function touchEntryPointFiles(preferCamel = false) {
   const fileName = preferCamel ? camelCasedName : name;
 
   const testTemplate = [
-    `const { describe, it } = require('node:test');`,
+    `const { describe, it } = require("node:test");`,
     `const expect = require("unexpected");`,
     `const ${camelCasedName} = require("../lib/${fileName}");`,
     "",
