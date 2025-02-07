@@ -19,15 +19,11 @@ if (major < 20) {
 }
 
 const fs = require("fs");
-const { promisify } = require("util");
+const { stat, unlink, readFile, writeFile } = require('node:fs/promises')
 const childProcess = require("child_process");
 const path = require("path");
 
 const resolveFromRoot = (...args) => path.resolve(__dirname, ...args);
-const stat = promisify(fs.stat);
-const unlinkFile = promisify(fs.unlink);
-const readFile = promisify(fs.readFile);
-const writeFile = promisify(fs.writeFile);
 
 function exec(command) {
   return new Promise((resolve, reject) => {
@@ -325,7 +321,7 @@ async function selfRemove() {
   if (SKIPREMOVAL) {
     console.error("Skipping removal of: %s", __filename);
   } else {
-    await unlinkFile(__filename);
+    await unlink(__filename);
     // Remove the usage notes in README.md
     await writeFile(resolveFromRoot("README.md"), "");
   }
