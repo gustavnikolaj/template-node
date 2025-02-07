@@ -1,1 +1,4 @@
 /node_modules
+
+# __local: folder used for notes etc. not suited to be in the repo
+__local/
