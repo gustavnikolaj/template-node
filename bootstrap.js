@@ -19,7 +19,7 @@ if (major < 20) {
 }
 
 const fs = require("fs");
-const { stat, unlink, readFile, writeFile } = require('node:fs/promises')
+const { stat, readFile, writeFile, rm } = require('node:fs/promises');
 const childProcess = require("child_process");
 const path = require("path");
 
@@ -75,6 +75,21 @@ function cjs2esm(str) {
       'import $1 from "$2";'
     )
     .replace("module.exports =", "export default")
+}
+
+const TEMPLATE_DIR = resolveFromRoot('templates')
+
+async function template(file, data = {}) {
+  const templatePath = path.resolve(TEMPLATE_DIR, file);
+  let content = await readFile(templatePath, 'utf-8');
+
+  for (const [key, value] of Object.entries(data)) {
+    let keyRegExpEscaped = `[${key.split('').join('][')}]`;
+    let regex = new RegExp(`%%${keyRegExpEscaped}%%`, 'g')
+    content = content.replace(regex, value);
+  }
+
+  return content;
 }
 
 async function loadPackageJson() {
@@ -195,18 +210,14 @@ async function installEslintAndPrettier(shouldBeEsmSyntax) {
     pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
     await savePackageJson(pkgJson);
 
-    if (shouldBeEsmSyntax) {
-      let eslintConfPath = resolveFromRoot('eslint.config.js');
-      let conf = await readFile(eslintConfPath, 'utf-8');
+    const eslintConfPath = resolveFromRoot('eslint.config.js');
 
-      conf = cjs2esm(conf);
-      conf = conf.replace(
-        /\{\s*languageOptions:\s*\{\s*sourceType:\s*"commonjs",\s*\},\s*\},\s*/,
-        ''
-      )
+    let eslintConfSourceTemplate = shouldBeEsmSyntax
+      ? "esm/eslint.config.js"
+      : "cjs/eslint.config.js";
+    let content = await template(eslintConfSourceTemplate);
 
-      await writeFile(eslintConfPath, conf, 'utf-8')
-    }
+    await writeFile(eslintConfPath, content, 'utf-8')
   }
 }
 
@@ -321,7 +332,8 @@ async function selfRemove() {
   if (SKIPREMOVAL) {
     console.error("Skipping removal of: %s", __filename);
   } else {
-    await unlink(__filename);
+    await rm(__filename);
+    await rm(resolveFromRoot('templates'), { recursive: true });
     // Remove the usage notes in README.md
     await writeFile(resolveFromRoot("README.md"), "");
   }
