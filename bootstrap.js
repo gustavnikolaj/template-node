@@ -92,6 +92,11 @@ async function template(file, data = {}) {
   return content;
 }
 
+async function jsTemplate(shouldBeEsm, file, data) {
+  let templatePath = shouldBeEsm ? `esm/${file}` : `cjs/${file}`;
+  return template(templatePath, data);
+}
+
 async function loadPackageJson() {
   const contents = await readFile(resolveFromRoot("package.json"), "utf-8");
   return JSON.parse(contents);
@@ -212,10 +217,11 @@ async function installEslintAndPrettier(shouldBeEsmSyntax) {
 
     const eslintConfPath = resolveFromRoot('eslint.config.js');
 
-    let eslintConfSourceTemplate = shouldBeEsmSyntax
-      ? "esm/eslint.config.js"
-      : "cjs/eslint.config.js";
-    let content = await template(eslintConfSourceTemplate);
+    let content = await jsTemplate(
+      shouldBeEsmSyntax,
+      'eslint.config.js',
+      eslintConfSourceTemplate
+    );
 
     await writeFile(eslintConfPath, content, 'utf-8')
   }
