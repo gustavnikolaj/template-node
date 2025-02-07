@@ -19,7 +19,6 @@ if (major < 20) {
 }
 
 const fs = require("node:fs/promises");
-const { stat, readFile, writeFile, rm } = require('node:fs/promises');
 const childProcess = require("child_process");
 const path = require("path");
 
@@ -54,7 +53,7 @@ async function fileExists(path) {
   const resolvedPath = resolveFromRoot(path);
 
   try {
-    await stat(resolvedPath);
+    await fs.stat(resolvedPath);
     return true;
   } catch (e) {
     if (e.code === "ENOENT") {
@@ -68,7 +67,7 @@ const TEMPLATE_DIR = resolveFromRoot('templates')
 
 async function template(file, data = {}) {
   const templatePath = path.resolve(TEMPLATE_DIR, file);
-  let content = await readFile(templatePath, 'utf-8');
+  let content = await fs.readFile(templatePath, 'utf-8');
 
   for (const [key, value] of Object.entries(data)) {
     let keyRegExpEscaped = `[${key.split('').join('][')}]`;
@@ -85,13 +84,13 @@ async function jsTemplate(shouldBeEsm, file, data) {
 }
 
 async function loadPackageJson() {
-  const contents = await readFile(resolveFromRoot("package.json"), "utf-8");
+  const contents = await fs.readFile(resolveFromRoot("package.json"), "utf-8");
   return JSON.parse(contents);
 }
 
 async function savePackageJson(contents) {
   const serialized = JSON.stringify(contents, null, 2);
-  return writeFile(resolveFromRoot("package.json"), serialized);
+  return fs.writeFile(resolveFromRoot("package.json"), serialized);
 }
 
 function sortObjectKeys(obj) {
@@ -210,7 +209,7 @@ async function installEslintAndPrettier(shouldBeEsmSyntax) {
       'eslint.config.js'
     );
 
-    await writeFile(eslintConfPath, content, 'utf-8')
+    await fs.writeFile(eslintConfPath, content, 'utf-8')
   }
 }
 
@@ -231,7 +230,7 @@ async function nvmInit() {
     if (process.env.NVM_DIR) {
       const nvmFile = resolveFromRoot(".nvmrc");
       const nodeVersion = process.version.replace(/^v/, "");
-      await writeFile(nvmFile, nodeVersion);
+      await fs.writeFile(nvmFile, nodeVersion);
     } else {
       console.error("Skipping nvm configuration: nvm not found.");
     }
@@ -306,10 +305,10 @@ async function setupVsCode(shouldBeEsmSyntax) {
   }
 
   const contents = JSON.stringify(settings, null, 4) + "\n";
-  fs.writeFileSync(settingsPath, contents, "utf-8");
+  await fs.writeFile(settingsPath, contents, "utf-8");
 
   const gitignoreContent = "\n# VS Code User Specific Settings\n/.vscode/settings.json\n";
-  fs.appendFileSync(gitignorePath, gitignoreContent, "utf-8");
+  await fs.appendFile(gitignorePath, gitignoreContent, "utf-8");
 }
 
 async function selfRemove() {
@@ -320,10 +319,10 @@ async function selfRemove() {
   if (SKIPREMOVAL) {
     console.error("Skipping removal of: %s", __filename);
   } else {
-    await rm(__filename);
-    await rm(resolveFromRoot('templates'), { recursive: true });
+    await fs.rm(__filename);
+    await fs.rm(resolveFromRoot('templates'), { recursive: true });
     // Remove the usage notes in README.md
-    await writeFile(resolveFromRoot("README.md"), "");
+    await fs.writeFile(resolveFromRoot("README.md"), "");
   }
 }
 
