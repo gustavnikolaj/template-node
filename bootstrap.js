@@ -193,7 +193,8 @@ async function installEslintAndPrettier(shouldBeEsmSyntax) {
     await npmInstallDev(
       "prettier",
       "eslint",
-      "eslint-plugin-import"
+      "eslint-plugin-import",
+      "globals"
     );
 
     const pkgJson = await loadPackageJson();
