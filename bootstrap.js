@@ -18,7 +18,7 @@ if (major < 20) {
   );
 }
 
-const fs = require("fs");
+const fs = require("node:fs/promises");
 const { stat, readFile, writeFile, rm } = require('node:fs/promises');
 const childProcess = require("child_process");
 const path = require("path");
@@ -62,19 +62,6 @@ async function fileExists(path) {
     }
     throw e;
   }
-}
-
-function cjs2esm(str) {
-  return str
-    .replace(
-      /const (\w+) = require\("(.+)"\);/g,
-      'import $1 from "$2";'
-    )
-    .replace(
-      /const (\{[\w\s,]*\}) = require\("(.+)"\);/g,
-      'import $1 from "$2";'
-    )
-    .replace("module.exports =", "export default")
 }
 
 const TEMPLATE_DIR = resolveFromRoot('templates')
@@ -219,8 +206,7 @@ async function installEslintAndPrettier(shouldBeEsmSyntax) {
 
     let content = await jsTemplate(
       shouldBeEsmSyntax,
-      'eslint.config.js',
-      eslintConfSourceTemplate
+      'eslint.config.js'
     );
 
     await writeFile(eslintConfPath, content, 'utf-8')
@@ -277,35 +263,30 @@ async function touchEntryPointFiles(shouldBeEsmSyntax, preferCamel = false) {
   const libDir = resolveFromRoot('lib');
   const testDir = resolveFromRoot('test');
 
-  fs.mkdirSync(libDir);
-  fs.mkdirSync(testDir);
-
-  let template = shouldBeEsmSyntax
-    ? `export default function ${camelCasedName}() {}\n`
-    : `module.exports = function ${camelCasedName}() {};\n`;
+  await fs.mkdir(libDir);
+  await fs.mkdir(testDir);
 
   const fileName = preferCamel ? camelCasedName : name;
-  const importName = shouldBeEsmSyntax ? `${fileName}.js` : fileName;
 
-  let testTemplate = [
-    `const { describe, it } = require("node:test");`,
-    `const expect = require("unexpected");`,
-    `const ${camelCasedName} = require("../lib/${importName}");`,
-    "",
-    `describe("${fileName}", () => {`,
-    `  it("should be a function", () => {`,
-    `    expect(${camelCasedName}, "to be a function");`,
-    `  });`,
-    `});`,
-    ""
-  ].join("\n");
+  let templateData = {
+    MODULE_NAME: camelCasedName,
+    MODULE_FILENAME: fileName
+  };
 
-  if (shouldBeEsmSyntax) {
-    testTemplate = cjs2esm(testTemplate);
-  }
+  let templateContent = await jsTemplate(
+    shouldBeEsmSyntax,
+     "lib/entry.js",
+    templateData
+  );
 
-  fs.writeFileSync(resolveFromRoot(`lib/${fileName}.js`), template, "utf-8");
-  fs.writeFileSync(resolveFromRoot(`test/${fileName}.spec.js`), testTemplate, "utf-8");
+  let testTemplateContent = await jsTemplate(
+    shouldBeEsmSyntax,
+    "test/entry.test.js",
+    templateData
+  );
+
+  await fs.writeFile(resolveFromRoot(`lib/${fileName}.js`), templateContent, "utf-8");
+  await fs.writeFile(resolveFromRoot(`test/${fileName}.test.js`), testTemplateContent, "utf-8");
 
   pkgJson.main = `lib/${fileName}.js`;
 
