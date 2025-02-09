@@ -3,3 +3,4 @@ Dockerfile export-ignore
 .dockerignore export-ignore
 .gitattributes export-ignore
 run.sh export-ignore
+run-local.sh export-ignore
