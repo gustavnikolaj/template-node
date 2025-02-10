@@ -73,11 +73,6 @@ async function template(file, data = {}) {
   return miniEjs(content, data);
 }
 
-async function jsTemplate(shouldBeEsm, file, data) {
-  let templatePath = shouldBeEsm ? `esm/${file}` : `cjs/${file}`;
-  return template(templatePath, data);
-}
-
 async function loadPackageJson() {
   const contents = await fs.readFile(resolveFromRoot("package.json"), "utf-8");
   return JSON.parse(contents);
@@ -166,10 +161,7 @@ async function installEslintAndPrettier(shouldBeEsmSyntax) {
 
     const eslintConfPath = resolveFromRoot('eslint.config.js');
 
-    let content = await jsTemplate(
-      shouldBeEsmSyntax,
-      'eslint.config.js'
-    );
+    let content = await template('eslint.config.js.ejs', { shouldBeEsmSyntax });
 
     await fs.writeFile(eslintConfPath, content, 'utf-8')
   }
@@ -231,18 +223,17 @@ async function touchEntryPointFiles(shouldBeEsmSyntax, preferCamel = false) {
   const fileName = preferCamel ? camelCasedName : name;
 
   let templateData = {
+    shouldBeEsmSyntax,
     MODULE_NAME: camelCasedName,
     MODULE_FILENAME: fileName
   };
 
-  let templateContent = await jsTemplate(
-    shouldBeEsmSyntax,
+  let templateContent = await template(
      "lib/entry.js.ejs",
     templateData
   );
 
-  let testTemplateContent = await jsTemplate(
-    shouldBeEsmSyntax,
+  let testTemplateContent = await template(
     "test/entry.test.js.ejs",
     templateData
   );
