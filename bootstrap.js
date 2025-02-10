@@ -22,6 +22,8 @@ const fs = require("node:fs/promises");
 const childProcess = require("child_process");
 const path = require("path");
 
+const miniEjs = require('./_lib/mini-ejs');
+
 const resolveFromRoot = (...args) => path.resolve(__dirname, ...args);
 
 function exec(command) {
@@ -68,14 +70,7 @@ const TEMPLATE_DIR = resolveFromRoot('templates')
 async function template(file, data = {}) {
   const templatePath = path.resolve(TEMPLATE_DIR, file);
   let content = await fs.readFile(templatePath, 'utf-8');
-
-  for (const [key, value] of Object.entries(data)) {
-    let keyRegExpEscaped = `[${key.split('').join('][')}]`;
-    let regex = new RegExp(`%%${keyRegExpEscaped}%%`, 'g')
-    content = content.replace(regex, value);
-  }
-
-  return content;
+  return miniEjs(content, data);
 }
 
 async function jsTemplate(shouldBeEsm, file, data) {
@@ -145,44 +140,11 @@ async function npmInstallDev(...packages) {
 }
 
 async function npmInit(shouldBeEsmSyntax) {
-  if (await fileExists("package.json")) {
-    console.error("Skipping `npm init`, package.json already exists.");
-  } else {
-    const env = Object.create(process.env);
-    env.NPM_CONFIG_INIT_VERSION = "0.0.0";
-    await spawn("npm", ["init", "-y"], { env });
-
-    // clean up the package.json file. npm init with the -y flag has some
-    // default behavior we don't want to inherit.
-    let pkgJson = await loadPackageJson();
-
-    // npm init will default the description to the first line of the README.md
-    // if the file exists when it is being run.
-    pkgJson.description = "";
-
-    // npm init will default the main property to a seemingly random .js file
-    // in the project if it's not empty yet.
-    pkgJson.main = "";
-
-    // unset the default test target
-    if (pkgJson.scripts && pkgJson.scripts.test) {
-      delete pkgJson.scripts.test;
-    }
-
-    if (shouldBeEsmSyntax) {
-      // Dumb way to set type: module, but if I just add the property
-      // directly on the object, it will be added to the top, and I want
-      // it after the main property. This was the easy and dumbest way...
-      let pkgJsonString = JSON.stringify(pkgJson);
-      pkgJsonString = pkgJsonString.replace(
-        ',"main":"",',
-        ',"main":"","type":"module",'
-      );
-      pkgJson = JSON.parse(pkgJsonString);
-    }
-
-    await savePackageJson(pkgJson);
-  }
+  const content = await template('package.json.ejs', {
+    folderName: path.basename(resolveFromRoot()),
+    shouldBeEsmSyntax
+  });
+  await fs.writeFile(resolveFromRoot('package.json'), content, 'utf-8');
 }
 
 async function installEslintAndPrettier(shouldBeEsmSyntax) {
@@ -275,13 +237,13 @@ async function touchEntryPointFiles(shouldBeEsmSyntax, preferCamel = false) {
 
   let templateContent = await jsTemplate(
     shouldBeEsmSyntax,
-     "lib/entry.js",
+     "lib/entry.js.ejs",
     templateData
   );
 
   let testTemplateContent = await jsTemplate(
     shouldBeEsmSyntax,
-    "test/entry.test.js",
+    "test/entry.test.js.ejs",
     templateData
   );
 
@@ -321,6 +283,7 @@ async function selfRemove() {
   } else {
     await fs.rm(__filename);
     await fs.rm(resolveFromRoot('templates'), { recursive: true });
+    await fs.rm(resolveFromRoot('_lib'), { recursive: true });
     // Remove the usage notes in README.md
     await fs.writeFile(resolveFromRoot("README.md"), "");
   }
