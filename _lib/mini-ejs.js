@@ -1,6 +1,6 @@
 const vm = require('vm');
 
-module.exports = function miniEjs(str, data) {
+function compileTemplate(str) {
   const segments = str.split(/(<%=?|-?%>)/g);
   let STATES = { IN_TEXT: 0, IN_JS: 1, IN_PRINT: 2 }
   let STATE = STATES.IN_TEXT;
@@ -57,10 +57,15 @@ module.exports = function miniEjs(str, data) {
     throw new Error('Invalid template. Unterminated template expression.')
   }
 
-  let context = { o: "", ...data };
+  return evalSegments.join(';');
+}
+
+module.exports = function miniEjs(str, data) {
+  const code = compileTemplate(str);
+  const context = { o: "", ...data };
 
   vm.createContext(context);
-  vm.runInContext(evalSegments.join(';'), context);
+  vm.runInContext(code, context);
 
   return context.o;
 }
