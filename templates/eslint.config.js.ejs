@@ -12,6 +12,7 @@ const globals = require("globals");
   importPlugin.flatConfigs.recommended,
   {
     languageOptions: {
+      ecmaVersion: "latest",
       <% if (!shouldBeEsmSyntax) { -%>
         sourceType: "commonjs",
       <% } -%>
