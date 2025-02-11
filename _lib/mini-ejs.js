@@ -40,6 +40,9 @@ module.exports = function miniEjs(str, data) {
         throw new Error('Parse error: <% inside <%= found.');
       } else if (segment === "<%=") {
         throw new Error('Parse error: <%= inside <%= found.');
+      } else if (segment === "-%>") {
+        STATE = STATES.IN_TEXT;
+        TRIM_NEXT_NEWLINE = true;
       } else if (segment === "%>") {
         STATE = STATES.IN_TEXT;
       } else {
