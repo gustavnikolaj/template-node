@@ -170,13 +170,16 @@ async function installEslintAndPrettier(shouldBeEsmSyntax) {
 async function setupTesting() {
   await npmInstallDev(
     "unexpected",
-    "mocha"
+    "mocha",
+    "c8"
   );
 
   const pkgJson = await loadPackageJson();
-  pkgJson.scripts = pkgJson.scripts || {};
-  pkgJson.scripts.test = "mocha";
-  pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
+  pkgJson.scripts = sortObjectKeys({
+    ...pkgJson.scripts,
+    test: "mocha",
+    coverage: "c8 --reporter=text --reporter=html --all --include lib npm test"
+  });
   await savePackageJson(pkgJson);
 }
 
