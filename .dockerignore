@@ -1,6 +1,0 @@
-# Exclude sandbox files
-.git
-Dockerfile
-.dockerignore
-.gitattributes
-run.sh
