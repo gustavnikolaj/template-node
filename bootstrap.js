@@ -18,16 +18,13 @@ if (major < 20) {
   );
 }
 
-const fs = require("fs");
-const { promisify } = require("util");
+const fs = require("node:fs/promises");
 const childProcess = require("child_process");
 const path = require("path");
 
+const miniEjs = require('./_lib/mini-ejs');
+
 const resolveFromRoot = (...args) => path.resolve(__dirname, ...args);
-const stat = promisify(fs.stat);
-const unlinkFile = promisify(fs.unlink);
-const readFile = promisify(fs.readFile);
-const writeFile = promisify(fs.writeFile);
 
 function exec(command) {
   return new Promise((resolve, reject) => {
@@ -58,7 +55,7 @@ async function fileExists(path) {
   const resolvedPath = resolveFromRoot(path);
 
   try {
-    await stat(resolvedPath);
+    await fs.stat(resolvedPath);
     return true;
   } catch (e) {
     if (e.code === "ENOENT") {
@@ -68,27 +65,22 @@ async function fileExists(path) {
   }
 }
 
-function cjs2esm(str) {
-  return str
-    .replace(
-      /const (\w+) = require\("(.+)"\);/g,
-      'import $1 from "$2";'
-    )
-    .replace(
-      /const (\{[\w\s,]*\}) = require\("(.+)"\);/g,
-      'import $1 from "$2";'
-    )
-    .replace("module.exports =", "export default")
+const TEMPLATE_DIR = resolveFromRoot('templates')
+
+async function template(file, data = {}) {
+  const templatePath = path.resolve(TEMPLATE_DIR, file);
+  let content = await fs.readFile(templatePath, 'utf-8');
+  return miniEjs(content, data);
 }
 
 async function loadPackageJson() {
-  const contents = await readFile(resolveFromRoot("package.json"), "utf-8");
+  const contents = await fs.readFile(resolveFromRoot("package.json"), "utf-8");
   return JSON.parse(contents);
 }
 
 async function savePackageJson(contents) {
   const serialized = JSON.stringify(contents, null, 2);
-  return writeFile(resolveFromRoot("package.json"), serialized);
+  return fs.writeFile(resolveFromRoot("package.json"), serialized);
 }
 
 function sortObjectKeys(obj) {
@@ -143,44 +135,11 @@ async function npmInstallDev(...packages) {
 }
 
 async function npmInit(shouldBeEsmSyntax) {
-  if (await fileExists("package.json")) {
-    console.error("Skipping `npm init`, package.json already exists.");
-  } else {
-    const env = Object.create(process.env);
-    env.NPM_CONFIG_INIT_VERSION = "0.0.0";
-    await spawn("npm", ["init", "-y"], { env });
-
-    // clean up the package.json file. npm init with the -y flag has some
-    // default behavior we don't want to inherit.
-    let pkgJson = await loadPackageJson();
-
-    // npm init will default the description to the first line of the README.md
-    // if the file exists when it is being run.
-    pkgJson.description = "";
-
-    // npm init will default the main property to a seemingly random .js file
-    // in the project if it's not empty yet.
-    pkgJson.main = "";
-
-    // unset the default test target
-    if (pkgJson.scripts && pkgJson.scripts.test) {
-      delete pkgJson.scripts.test;
-    }
-
-    if (shouldBeEsmSyntax) {
-      // Dumb way to set type: module, but if I just add the property
-      // directly on the object, it will be added to the top, and I want
-      // it after the main property. This was the easy and dumbest way...
-      let pkgJsonString = JSON.stringify(pkgJson);
-      pkgJsonString = pkgJsonString.replace(
-        ',"main":"",',
-        ',"main":"","type":"module",'
-      );
-      pkgJson = JSON.parse(pkgJsonString);
-    }
-
-    await savePackageJson(pkgJson);
-  }
+  const content = await template('package.json.ejs', {
+    folderName: path.basename(resolveFromRoot()),
+    shouldBeEsmSyntax
+  });
+  await fs.writeFile(resolveFromRoot('package.json'), content, 'utf-8');
 }
 
 async function installEslintAndPrettier(shouldBeEsmSyntax) {
@@ -190,7 +149,8 @@ async function installEslintAndPrettier(shouldBeEsmSyntax) {
     await npmInstallDev(
       "prettier",
       "eslint",
-      "eslint-plugin-import"
+      "eslint-plugin-import",
+      "globals"
     );
 
     const pkgJson = await loadPackageJson();
@@ -199,18 +159,11 @@ async function installEslintAndPrettier(shouldBeEsmSyntax) {
     pkgJson.scripts = sortObjectKeys(pkgJson.scripts);
     await savePackageJson(pkgJson);
 
-    if (shouldBeEsmSyntax) {
-      let eslintConfPath = resolveFromRoot('eslint.config.js');
-      let conf = await readFile(eslintConfPath, 'utf-8');
+    const eslintConfPath = resolveFromRoot('eslint.config.js');
 
-      conf = cjs2esm(conf);
-      conf = conf.replace(
-        /\{\s*languageOptions:\s*\{\s*sourceType:\s*"commonjs",\s*\},\s*\},\s*/,
-        ''
-      )
+    let content = await template('eslint.config.js.ejs', { shouldBeEsmSyntax });
 
-      await writeFile(eslintConfPath, conf, 'utf-8')
-    }
+    await fs.writeFile(eslintConfPath, content, 'utf-8')
   }
 }
 
@@ -231,7 +184,7 @@ async function nvmInit() {
     if (process.env.NVM_DIR) {
       const nvmFile = resolveFromRoot(".nvmrc");
       const nodeVersion = process.version.replace(/^v/, "");
-      await writeFile(nvmFile, nodeVersion);
+      await fs.writeFile(nvmFile, nodeVersion);
     } else {
       console.error("Skipping nvm configuration: nvm not found.");
     }
@@ -264,35 +217,29 @@ async function touchEntryPointFiles(shouldBeEsmSyntax, preferCamel = false) {
   const libDir = resolveFromRoot('lib');
   const testDir = resolveFromRoot('test');
 
-  fs.mkdirSync(libDir);
-  fs.mkdirSync(testDir);
-
-  let template = shouldBeEsmSyntax
-    ? `export default function ${camelCasedName}() {}\n`
-    : `module.exports = function ${camelCasedName}() {};\n`;
+  await fs.mkdir(libDir);
+  await fs.mkdir(testDir);
 
   const fileName = preferCamel ? camelCasedName : name;
-  const importName = shouldBeEsmSyntax ? `${fileName}.js` : fileName;
 
-  let testTemplate = [
-    `const { describe, it } = require("node:test");`,
-    `const expect = require("unexpected");`,
-    `const ${camelCasedName} = require("../lib/${importName}");`,
-    "",
-    `describe("${fileName}", () => {`,
-    `  it("should be a function", () => {`,
-    `    expect(${camelCasedName}, "to be a function");`,
-    `  });`,
-    `});`,
-    ""
-  ].join("\n");
+  let templateData = {
+    shouldBeEsmSyntax,
+    MODULE_NAME: camelCasedName,
+    MODULE_FILENAME: fileName
+  };
 
-  if (shouldBeEsmSyntax) {
-    testTemplate = cjs2esm(testTemplate);
-  }
+  let templateContent = await template(
+     "lib/entry.js.ejs",
+    templateData
+  );
 
-  fs.writeFileSync(resolveFromRoot(`lib/${fileName}.js`), template, "utf-8");
-  fs.writeFileSync(resolveFromRoot(`test/${fileName}.spec.js`), testTemplate, "utf-8");
+  let testTemplateContent = await template(
+    "test/entry.test.js.ejs",
+    templateData
+  );
+
+  await fs.writeFile(resolveFromRoot(`lib/${fileName}.js`), templateContent, "utf-8");
+  await fs.writeFile(resolveFromRoot(`test/${fileName}.test.js`), testTemplateContent, "utf-8");
 
   pkgJson.main = `lib/${fileName}.js`;
 
@@ -311,10 +258,10 @@ async function setupVsCode(shouldBeEsmSyntax) {
   }
 
   const contents = JSON.stringify(settings, null, 4) + "\n";
-  fs.writeFileSync(settingsPath, contents, "utf-8");
+  await fs.writeFile(settingsPath, contents, "utf-8");
 
   const gitignoreContent = "\n# VS Code User Specific Settings\n/.vscode/settings.json\n";
-  fs.appendFileSync(gitignorePath, gitignoreContent, "utf-8");
+  await fs.appendFile(gitignorePath, gitignoreContent, "utf-8");
 }
 
 async function selfRemove() {
@@ -325,9 +272,11 @@ async function selfRemove() {
   if (SKIPREMOVAL) {
     console.error("Skipping removal of: %s", __filename);
   } else {
-    await unlinkFile(__filename);
+    await fs.rm(__filename);
+    await fs.rm(resolveFromRoot('templates'), { recursive: true });
+    await fs.rm(resolveFromRoot('_lib'), { recursive: true });
     // Remove the usage notes in README.md
-    await writeFile(resolveFromRoot("README.md"), "");
+    await fs.writeFile(resolveFromRoot("README.md"), "");
   }
 }
 

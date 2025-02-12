@@ -1,0 +1,35 @@
+<% if (shouldBeEsmSyntax) { -%>
+import js from "@eslint/js";
+import importPlugin from "eslint-plugin-import";
+import globals from "globals";
+<% } else { -%>
+const js = require("@eslint/js");
+const importPlugin = require("eslint-plugin-import");
+const globals = require("globals");
+<% } %>
+<% if (shouldBeEsmSyntax) { -%>
+  export default
+<%- } else { -%>
+  module.exports =
+<%- } %> [
+  js.configs.recommended,
+  importPlugin.flatConfigs.recommended,
+  {
+    languageOptions: {
+      ecmaVersion: "latest",
+      <% if (!shouldBeEsmSyntax) { -%>
+        sourceType: "commonjs",
+      <% } -%>
+      globals: {
+        <% if (shouldBeEsmSyntax) { -%>
+          ...globals.nodeBuiltin,
+        <%- } else { -%>
+          ...globals.node,
+        <%- } %>
+      },
+    },
+  },
+  {
+    ignores: [],
+  },
+];

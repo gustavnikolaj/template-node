@@ -1,0 +1,5 @@
+<% if (shouldBeEsmSyntax) { -%>
+export default function <%=MODULE_NAME%>() {}
+<% } else { -%>
+module.exports = function <%=MODULE_NAME%>() {};
+<% } -%>
