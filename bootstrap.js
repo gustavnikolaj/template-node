@@ -1,15 +1,3 @@
-/*                         PROJECT BOOTSTRAP SCRIPT
- * ============================================================================
- *
- * After copying this template into a new folder, run this script to configure
- * and install dependencies.
- *
- * The script is idempotent so it can be run multiple times if it fails
- * partially or entirely, and it will resume from where ever it made it to.
- *
- * Upon success it will remove itself.
- */
-
 const [major] = process.versions.node.split('.').map(Number);
 
 if (major < 20) {
