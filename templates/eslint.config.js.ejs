@@ -7,7 +7,11 @@ const js = require("@eslint/js");
 const importPlugin = require("eslint-plugin-import");
 const globals = require("globals");
 <% } %>
-<% if (shouldBeEsmSyntax) { %>export default<%} else { -%>module.exports =<% } %> [
+<% if (shouldBeEsmSyntax) { -%>
+  export default
+<%- } else { -%>
+  module.exports =
+<%- } %> [
   js.configs.recommended,
   importPlugin.flatConfigs.recommended,
   {
@@ -17,7 +21,11 @@ const globals = require("globals");
         sourceType: "commonjs",
       <% } -%>
       globals: {
-        ...globals.<% if (shouldBeEsmSyntax) {%>nodeBuiltin<%} else { %>node<% } %>,
+        <% if (shouldBeEsmSyntax) { -%>
+          ...globals.nodeBuiltin,
+        <%- } else { -%>
+          ...globals.node,
+        <%- } %>
       },
     },
   },

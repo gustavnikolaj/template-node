@@ -1,61 +1,90 @@
 const vm = require('vm');
 
-function compileTemplate(str) {
-  const segments = str.split(/(<%=?|-?%>)/g);
-  let STATES = { IN_TEXT: 0, IN_JS: 1, IN_PRINT: 2 }
-  let STATE = STATES.IN_TEXT;
-  let TRIM_NEXT_NEWLINE = false;
+function createTextToken(value) {
+  return {
+    type: 'text',
+    value
+  }
+}
+function createPrintToken(value, trim) {
+  return {
+    type: 'print',
+    value,
+    trim
+  }
+}
+function createCodeToken(value, trim) {
+  return {
+    type: 'code',
+    value,
+    trim
+  }
+}
 
-  const evalSegments = [];
-  for (const segment of segments) {
-    if (STATE === STATES.IN_TEXT) {
-      if (segment === "<%") {
-        STATE = STATES.IN_JS;
-      } else if (segment === "<%=") {
-        STATE = STATES.IN_PRINT;
-      } else {
-        let processedSegment = segment
-        if (TRIM_NEXT_NEWLINE) {
-          processedSegment = segment.replace(/^\s+/, '');
-          TRIM_NEXT_NEWLINE = false
-        }
-        processedSegment = processedSegment.replace(/"/g, '\\"').replace(/\r?\n/g, '\\n')
-        evalSegments.push(`o += "${processedSegment}";`);
+function tokenize(str) {
+  const segments = str.split(/(<%-?=?|-?%>)/g);
+  const tokens = [];
+
+  for (let i = 0; i < segments.length ; i++) {
+    if (segments[i] === '<%' || segments[i] === "<%-") {
+      let trimBackwards = segments[i] === "<%-";
+      let trimForward = false;
+      if (segments[i+2] === '-%>') {
+        trimForward = true;
+      } else if (segments[i+2] !== '%>') {
+        throw new Error('Unclosed <%= expression, missing %>');
       }
-    } else if (STATE === STATES.IN_JS) {
-      if (segment === "<%") {
-        throw new Error('Parse error: <% inside <% found.');
-      } else if (segment === "<%=") {
-        throw new Error('Parse error: <%= inside <% found.');
-      } else if (segment === "-%>") {
-        STATE = STATES.IN_TEXT;
-        TRIM_NEXT_NEWLINE = true;
-      } else if (segment === "%>") {
-        STATE = STATES.IN_TEXT;
-      } else {
-        evalSegments.push(segment, ';');
+
+      tokens.push(createCodeToken(segments[i + 1], { backwards: trimBackwards, forward: trimForward }));
+      i = i + 2;
+    } else if (segments[i] === '<%=' || segments[i] === "<%-=") {
+      let trimBackwards = segments[i] === "<%-=";
+      let trimForward = false;
+      if (segments[i+2] === '-%>') {
+        trimForward = true;
+      } else if (segments[i+2] !== '%>') {
+        throw new Error('Unclosed <%= expression, missing %>');
       }
-    } else if (STATE === STATES.IN_PRINT) {
-      if (segment === "<%") {
-        throw new Error('Parse error: <% inside <%= found.');
-      } else if (segment === "<%=") {
-        throw new Error('Parse error: <%= inside <%= found.');
-      } else if (segment === "-%>") {
-        STATE = STATES.IN_TEXT;
-        TRIM_NEXT_NEWLINE = true;
-      } else if (segment === "%>") {
-        STATE = STATES.IN_TEXT;
-      } else {
-        evalSegments.push(`o += ${segment}`, ';');
-      }
+
+      tokens.push(createPrintToken(segments[i + 1], { backwards: trimBackwards, forward: trimForward }));
+      i = i + 2;
     } else {
-      throw new Error('Unknown state');
+      tokens.push(createTextToken(segments[i]))
     }
   }
 
-  if (STATE !== STATES.IN_TEXT) {
-    throw new Error('Invalid template. Unterminated template expression.')
-  }
+  return tokens;
+}
+
+function compileTemplate(str) {
+  const tokens = tokenize(str);
+
+  // Process trim instructions
+  for (let i = 0; i < tokens.length; i++) {
+    let token = tokens[i];
+
+    if (token.type === 'text') {
+      continue;
+    }
+
+    if (token.trim && token.trim.forward && i < tokens.length - 1 && tokens[i+1].type === 'text') {
+      tokens[i+1].value = tokens[i+1].value.replace(/^\s*/, '');
+    }
+
+    if (token.trim && token.trim.backwards && i > 0 && tokens[i-1].type === 'text') {
+      tokens[i-1].value = tokens[i-1].value.replace(/\s*$/, '');
+    }
+  };
+
+  const evalSegments = tokens.map(token => {
+    if (token.type === 'print') {
+      return `o += ${token.value}`;
+    } else if (token.type === 'code') {
+      return `${token.value}`;
+    } else {
+      return `o += "${token.value.replace(/"/g, '\\"').replace(/\r?\n/g, '\\n')}"`;
+    }
+  });
 
   return evalSegments.join(';');
 }
