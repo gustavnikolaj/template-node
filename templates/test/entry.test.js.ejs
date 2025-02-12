@@ -1,9 +1,9 @@
 <% if (shouldBeEsmSyntax) { -%>
-import { describe, it } from "node:test";
+import { describe, it } from "mocha";
 import expect from "unexpected";
 import <%=MODULE_NAME%> from "../lib/<%=MODULE_FILENAME%>.js";
 <%- } else { -%>
-const { describe, it } = require("node:test");
+const { describe, it } = require("mocha");
 const expect = require("unexpected");
 const <%=MODULE_NAME%> = require("../lib/<%=MODULE_FILENAME%>");
 <%- } %>
