@@ -241,7 +241,7 @@ async function touchEntryPointFiles(shouldBeEsmSyntax, preferCamel = false) {
 }
 
 async function setupVsCode(shouldBeEsmSyntax) {
-  fs.mkdirSync(resolveFromRoot(".vscode"));
+  await fs.mkdir(resolveFromRoot(".vscode"));
   const settingsPath = resolveFromRoot(".vscode/settings.json");
   const gitignorePath = resolveFromRoot(".gitignore");
 
